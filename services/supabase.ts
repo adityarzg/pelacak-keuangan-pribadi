@@ -11,14 +11,47 @@ declare global {
   }
 }
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Mendapatkan URL dan key Supabase dengan fallback untuk Cloudflare Workers
+const getSupabaseCredentials = () => {
+  // Untuk browser/Vite environment
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return {
+      url: import.meta.env.VITE_SUPABASE_URL,
+      key: import.meta.env.VITE_SUPABASE_ANON_KEY
+    };
+  }
+  
+  // Untuk Cloudflare Workers environment
+  if (typeof process !== 'undefined' && process.env) {
+    return {
+      url: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
+      key: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+    };
+  }
+  
+  // Fallback hardcoded (hanya untuk development)
+  console.warn('Menggunakan kredensial Supabase hardcoded - JANGAN GUNAKAN DI PRODUCTION');
+  return {
+    url: 'https://fawlvefmiyufgmczzehh.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhd2x2ZWZtaXl1ZmdtY3p6ZWhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxNDM1NTAsImV4cCI6MjA3NzcxOTU1MH0.r_YMEo_mvCSJnuc_oT1xPfoArRJzRtmJvd5R9c4DcLs'
+  };
+};
+
+const { url: supabaseUrl, key: supabaseAnonKey } = getSupabaseCredentials();
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL dan Anon Key harus disediakan di file .env');
+  throw new Error('Supabase URL dan Anon Key tidak tersedia');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Konfigurasi client dengan opsi tambahan untuk Cloudflare
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false // Penting untuk Cloudflare Workers
+  },
+  global: {
+    fetch: fetch // Menggunakan fetch global untuk kompatibilitas Cloudflare
+  }
+});
 
 // Fungsi helper untuk transaksi
 export const transactionService = {
